@@ -100,7 +100,7 @@ class Trainer(TrainerBlooprint):
         self._discriminator_epochs+=1
         
 
-    def train_generator(self,batch_size = 32):
+    def train_generator(self):
         self.gOptim.zero_grad()
         labels = torch.ones(self.latent_shape[0], dtype=torch.float32,device =self.device)
         z = torch.randn(self.latent_shape,device=self.device,dtype = torch.float32)
@@ -130,16 +130,47 @@ class Trainer(TrainerBlooprint):
         imgs = torchvision.utils.make_grid(imgs.cpu(),nrow = n_row).permute(1,2,0)
         return imgs
 
-    def train(self,
-    n_steps,regime = (1,1),
-    train_reconstruction = False,
-    batch_size =32,save_every = 500,
+    def train_with_epochs(self,
+    n_epochs=100,d_to_g_rate=3,
+    save_every = 100,
     transform = None,plot_every = 5
     ):
         """
         Args: 
-        n_steps: number of steps to train models
-        regime: tuple of integers representing the number of 
+        :n_epochs: number of epoch to train models
+        :d_to_g_rate: int Number of steps to train discrimnator
+        to the number of steps to train generator
+       """
+        self.generator.train()
+        self.discriminator.train()
+
+        for epoch in tqdm(range(n_epochs)):
+            for i,img in enumerate(self.loader):
+                self.train_discriminator(img.to(self.device))
+                if (i+1)%d_to_g_rate == 0:
+                    self.train_generator()
+                if (i+1)%save_every==0:
+                    self.save_models()
+
+            if (epoch+1)%plot_every == 0:
+                plt.close("all")
+                plt.imshow(
+                    self.generator_progress(transform=transform)
+                    )
+                plt.show()
+    
+        self.save_models()
+
+    def train(self,
+    n_steps,regime = (1,1),
+    train_reconstruction = False,
+    save_every = 500,
+    transform = None,plot_every = 5
+    ):
+        """
+        Args: 
+        :n_steps: number of steps to train models
+        :regime: tuple of integers representing the number of 
         times to perform the discriminator and generator step respectively
         """
         self.generator.train()
@@ -153,7 +184,7 @@ class Trainer(TrainerBlooprint):
             for _ in range(g_steps):
                 if train_reconstruction:
                     self.reconstruction_step(next(iter(self.loader)).to(self.device))
-                self.train_generator(batch_size=batch_size)
+                self.train_generator()
             if (i+1)%save_every==0:
                 self.save_models()
 
