@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from torchvision.datasets import ImageFolder
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset,Subset
@@ -43,3 +44,17 @@ class CelebaDataset(Dataset):
     def un_normalize(self,img):
         device = img.device
         return img*self.stds.to(device) + self.means.to(device)
+
+
+
+class Augmentator(nn.Sequential):
+
+    def __init__(self,transforms):
+        super(Augmentator, self).__init__()
+        if transforms is not None:
+            for trans in transforms:
+                self.add_module(trans)
+        else:
+            pass
+
+        

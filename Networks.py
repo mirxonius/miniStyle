@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from NetBlocks import convBlock, deConvBlock, SynthBlock, BaseBlock,AdaIN
+from NetBlocks import convBlock, deConvBlock, SynthBlock, BaseBlock,AdaIN, DiscBlock
 
 
 
@@ -32,7 +32,7 @@ class SythesisNetwork(nn.Module):
     """
     styleGAN generator
     """
-    def __init__(self,latent_dim = 512):
+    def __init__(self,latent_dim = 512,):
         super().__init__()
 
         self.mapping_network = MappingNetwork(latent_dim=latent_dim)
@@ -43,15 +43,15 @@ class SythesisNetwork(nn.Module):
         )
         self.up2 = nn.Upsample(size = 16,mode = "bilinear")
         self.block2 =SynthBlock(
-            in_channels=128,out_channels=64,img_size=16,latent_dim=latent_dim
+            in_channels=128,out_channels=128,img_size=16,latent_dim=latent_dim
         )
         self.up3 = nn.Upsample(size = 32,mode = "bilinear")
         self.block3 = SynthBlock(
-            in_channels=64,out_channels=32,img_size=32,latent_dim=latent_dim
+            in_channels=128,out_channels=64,img_size=32,latent_dim=latent_dim
         )
         self.up4 = nn.Upsample(size = 64,mode = "bilinear")
         self.block4 = SynthBlock(
-            in_channels=32,out_channels=3,img_size=64,latent_dim=latent_dim
+            in_channels=64,out_channels=3,img_size=64,latent_dim=latent_dim
             )
         self.tanh = nn.Tanh()
         self.initialize_weights()
@@ -134,9 +134,13 @@ class Discriminator(nn.Module):
                 m.initialize_weights()
 
 
+
 class DCStyleGenerator(nn.Module):
     def __init__(self,latent_size = 100,) -> None:
         super().__init__()
+        """
+        DC GAN generator that uses styes with ADAIN
+        """
         self.latent_size = latent_size
         self.mapping_network = MappingNetwork(latent_dim=latent_size)
 
@@ -248,3 +252,34 @@ class DCGenerator(nn.Module):
         out = self.net(x)
         return out
 
+
+
+class StyleDiscrimnator(nn.Module):
+    """
+    Disciminator similar to the one described in: https://arxiv.org/pdf/1710.10196.pdf
+    It uses convolutional blocks and downsampling
+    """
+    def __init__(self,img_resolution = 64):
+        super().__init__()
+        
+        self.img_resolution = img_resolution
+        n_blocks = int(torch.log2(64))
+        blocks = []
+        res = self.img_resolution
+        for _ in range(n_blocks):
+            res /= 2
+            blocks.append(
+                DiscBlock(in_channels=512,out_channels=512)
+                )
+            #Upsample can be used for downsampling as well    
+            blocks.append(nn.Upsample(
+                size =int(res),mode = "bilinear")
+                )
+
+        blocks.append(nn.Flatten())
+        blocks.append(nn.Linear(512,1))
+        self.net = nn.Sequential(*blocks)
+
+
+    def forward(self, x):
+        return self.net(x)

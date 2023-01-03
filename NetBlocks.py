@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-import numpy
+
 ###################################
 # Adaptive Instance Normalization #
 ###################################
@@ -74,22 +74,16 @@ class SynthBlock(nn.Module):
         self.out_channels = out_channels
         self.B_noise = nn.Parameter(1e-1*torch.randn(out_channels)).view(1,-1,1,1)
         
-        self.conv1 = nn.Conv2d(
-            in_channels=in_channels,out_channels=out_channels,
-            kernel_size=3,padding = 1)
+       
+        self.conv1 = convBlock(
+            in_chs=in_channels,out_chs=out_channels,
+            kernel_size=3,padding = 1,use_batchNorm=True
+        )
         
-        #self.conv1 = convBlock(
-        #    in_chs=in_channels,out_chs=out_channels,
-        #    kernel_size=3,padding = 1
-        #)
-        
-        #self.conv2 = convBlock(
-        #    in_chs=out_channels,out_chs=out_channels,
-        #    kernel_size=3,padding = 1)
+        self.conv2 = convBlock(
+            in_chs=out_channels,out_chs=out_channels,
+            kernel_size=3,padding = 1,use_batchNorm=True)
 
-        self.conv2 = nn.Conv2d(
-            in_channels=out_channels,out_channels=out_channels,
-            kernel_size=3,padding = 1)
         
         self.ada_in1 = AdaIN(img_size,latent_dim,out_channels)
         self.ada_in2 = AdaIN(img_size,latent_dim,out_channels)
@@ -164,3 +158,52 @@ class deConvBlock(nn.Sequential):
         for m in self.modules():
             if isinstance(m, nn.ConvTranspose2d):
                 nn.init.kaiming_normal_(m.weight)
+
+
+class DiscBlock(nn.Module):
+
+    def __init__(self,
+    in_channels,out_channels,
+    activation = nn.LeakyReLU(0.2),
+    use_batchNorm = True):
+    
+        super(DiscBlock, self).__init__()
+
+        self.activation = activation
+        self.conv1 = nn.Conv2d(
+        in_channels = in_channels,
+        out_channels = out_channels,
+        kernel_size=3,padding = 1,
+        bias = not use_batchNorm,
+         )
+        self.conv2 = nn.Conv2d(
+            in_channels = out_channels,
+            out_channels = out_channels,
+            kernel_size=3,padding = 1,
+            bias = not use_batchNorm
+        )
+        if use_batchNorm:
+            self.net = nn.Sequential(
+                self.conv1,
+                nn.BatchNorm2d(out_channels),
+                self.activation,
+                self.conv2,
+                nn.BatchNorm2d(out_channels),
+                self.activation,
+            )
+        else:
+            self.net = nn.Sequential(
+                self.conv1,
+                self.activation,
+                self.conv2,
+                self.activation,
+            )
+
+    def forward(self, x):
+        return self.net(x)
+
+    def initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                nn.init.kaiming_normal_(m.weight)
+                
