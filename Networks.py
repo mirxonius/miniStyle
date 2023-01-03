@@ -43,17 +43,17 @@ class SythesisNetwork(nn.Module):
         )
         self.up2 = nn.Upsample(size = 16,mode = "bilinear")
         self.block2 =SynthBlock(
-            in_channels=128,out_channels=128,img_size=16,latent_dim=latent_dim
+            in_channels=128,out_channels=64,img_size=16,latent_dim=latent_dim
         )
         self.up3 = nn.Upsample(size = 32,mode = "bilinear")
         self.block3 = SynthBlock(
-            in_channels=128,out_channels=64,img_size=32,latent_dim=latent_dim
+            in_channels=64,out_channels=32,img_size=32,latent_dim=latent_dim
         )
         self.up4 = nn.Upsample(size = 64,mode = "bilinear")
         self.block4 = SynthBlock(
-            in_channels=64,out_channels=3,img_size=64,latent_dim=latent_dim
+            in_channels=32,out_channels=3,img_size=64,latent_dim=latent_dim
             )
-        #self.tanh = nn.Tanh()
+        self.tanh = nn.Tanh()
         self.initialize_weights()
 
     def forward(self,z):
@@ -71,17 +71,15 @@ class SythesisNetwork(nn.Module):
 
         out = self.up4(out)
         out = self.block4(out,W)
-        return out
+        return self.tanh(out)
 
     def initialize_weights(self):
         for m in self.modules():
-            print(m)
             if isinstance(m, nn.Conv2d):
                     nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
             elif isinstance(m, nn.Linear):
                 nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='leaky_relu')
             elif (not isinstance(m,SythesisNetwork)) and hasattr(m,"initialize_weights"):
-                print(m)
                 m.initialize_weights()
 
 
@@ -167,7 +165,7 @@ class DCStyleGenerator(nn.Module):
             in_chs =128 ,out_chs=3, kernel_size = 4 ,stride = 2, padding=1,
             activation = self.tanh  
                         )
-        self.ada_in5 = AdaIN(32,latent_size,3)
+        #self.ada_in5 = AdaIN(32,latent_size,3)
 
     def forward(self,z):
         w = self.mapping_network(z.view(-1,self.latent_size))
@@ -181,7 +179,7 @@ class DCStyleGenerator(nn.Module):
         out = self.layer4(out)
         out = self.ada_in4(out,w)
         out = self.layer5(out)
-        out = self.ada_in5(out,w)
+        #out = self.ada_in5(out,w)
         return self.tanh(out)
 
     def inialize_weights(self):

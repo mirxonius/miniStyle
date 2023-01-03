@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-
+import numpy
 ###################################
 # Adaptive Instance Normalization #
 ###################################
@@ -19,7 +19,8 @@ class AdaIN(nn.Module):
         std = img.std(dim =(2,3),keepdim = True) + eps
         
         ys,yb = self.A(w).view(-1,2*self.channels,1,1).chunk(2,dim = 1)
-        return ys*(img-mu)/std + yb#y[:,0,...]*(img-mu)/std + y[:,1,...]
+        #return ys*(img-mu)/std + yb
+        return (ys+1)*(img-mu)/std + yb
 
     def initialize_weights(self):
         for m in self.modules():
@@ -46,18 +47,18 @@ class BaseBlock(nn.Module):
     def forward(self,w):
         out = self.base 
         noise = torch.randn(out.size(0),1,out.size(2),out.size(3)).to(w.device)
-        out += self.B1_noise.to(noise.device)*noise
+        out = out + self.B1_noise.to(noise.device)*noise
         out = self.ada_in1(out,w)
         out = self.conv(out) 
         noise = torch.randn(out.size(0),1,out.size(2),out.size(3)).to(w.device)
-        out += self.B2_noise.to(noise.device)*noise
+        out =out + self.B2_noise.to(noise.device)*noise
         return self.ada_in2(out,w)
 
     def initialize_weights(self):
         nn.init.kaiming_normal(self.base, mode='fan_out', nonlinearity='relu')
         for module in self.modules():
-            if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear):
-                nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='relu')
+            if isinstance(module, nn.Conv2d):
+                nn.init.kaiming_normal_(module.weight, mode='fan_out', nonlinearity='leaky_relu')
             elif (not isinstance(module, BaseBlock)) and hasattr(module,"initialize_weights"):
                 module.initialize_weights()
 
@@ -73,22 +74,22 @@ class SynthBlock(nn.Module):
         self.out_channels = out_channels
         self.B_noise = nn.Parameter(1e-1*torch.randn(out_channels)).view(1,-1,1,1)
         
-        #self.conv1 = nn.Conv2d(
-        #    in_channels=in_channels,out_channels=out_channels,
-        #    kernel_size=3,padding = 1)
-        
-        self.conv1 = convBlock(
-            in_chs=in_channels,out_chs=out_channels,
-            kernel_size=3,padding = 1
-        )
-        
-        self.conv2 = convBlock(
-            in_chs=out_channels,out_chs=out_channels,
+        self.conv1 = nn.Conv2d(
+            in_channels=in_channels,out_channels=out_channels,
             kernel_size=3,padding = 1)
-
-        #self.conv2 = nn.Conv2d(
-        #    in_channels=out_channels,out_channels=out_channels,
+        
+        #self.conv1 = convBlock(
+        #    in_chs=in_channels,out_chs=out_channels,
+        #    kernel_size=3,padding = 1
+        #)
+        
+        #self.conv2 = convBlock(
+        #    in_chs=out_channels,out_chs=out_channels,
         #    kernel_size=3,padding = 1)
+
+        self.conv2 = nn.Conv2d(
+            in_channels=out_channels,out_channels=out_channels,
+            kernel_size=3,padding = 1)
         
         self.ada_in1 = AdaIN(img_size,latent_dim,out_channels)
         self.ada_in2 = AdaIN(img_size,latent_dim,out_channels)
@@ -99,11 +100,11 @@ class SynthBlock(nn.Module):
         out = self.conv1(img)
         #out: out_channels X img_size X img_size
         noise = torch.randn(out.size(0),1,out.size(2),out.size(3)).to(img.device)
-        out += self.B_noise.to(noise.device)*noise
+        out =out + self.B_noise.to(noise.device)*noise
         out = self.ada_in1(out,w)
         out = self.conv2(out)
         noise = torch.randn(out.size(0),1,out.size(2),out.size(3)).to(img.device)
-        out += self.B_noise.to(noise.device)*noise
+        out =out+ self.B_noise.to(noise.device)*noise
         out = self.ada_in2(out,w)
         return out
 
@@ -119,7 +120,9 @@ class SynthBlock(nn.Module):
 #####################################
 class convBlock(nn.Sequential):
     def __init__(self,in_chs,out_chs,kernel_size = 4,
-                 stride = 1,padding= 1,activation = nn.LeakyReLU(0.2,inplace = False)):
+                 stride = 1,padding= 1,
+                 activation = nn.LeakyReLU(0.2,inplace = False),
+                 use_batchNorm = True):
         super().__init__()
         self.add_module(
            "conv",
@@ -129,7 +132,7 @@ class convBlock(nn.Sequential):
            kernel_size=kernel_size,
            padding=padding,stride = stride,bias = False)
         )
-        if out_chs >1:
+        if out_chs > 1 and use_batchNorm:
             self.add_module("bnorm",nn.BatchNorm2d(out_chs))
         if activation is not None:
             self.add_module("activation",activation)
