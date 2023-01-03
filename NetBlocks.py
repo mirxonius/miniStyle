@@ -67,7 +67,7 @@ class BaseBlock(nn.Module):
 #######################
 class SynthBlock(nn.Module):
     """Synthesys block, after upsampling"""
-    def __init__(self,in_channels,out_channels,img_size,latent_dim = 512,device = "cpu"):
+    def __init__(self,in_channels,out_channels,img_size,latent_dim = 512,use_batchNorm = True,activation = nn.LeakyReLU(0.2)):
         super().__init__()
         self.latent_dim = latent_dim
         self.img_size = img_size
@@ -77,12 +77,12 @@ class SynthBlock(nn.Module):
        
         self.conv1 = convBlock(
             in_chs=in_channels,out_chs=out_channels,
-            kernel_size=3,padding = 1,use_batchNorm=True
+            kernel_size=3,padding = 1,use_batchNorm=use_batchNorm,activation = activation
         )
         
         self.conv2 = convBlock(
             in_chs=out_channels,out_chs=out_channels,
-            kernel_size=3,padding = 1,use_batchNorm=True)
+            kernel_size=3,padding = 1,use_batchNorm=use_batchNorm,activation = activation)
 
         
         self.ada_in1 = AdaIN(img_size,latent_dim,out_channels)

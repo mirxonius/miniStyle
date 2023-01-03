@@ -32,28 +32,31 @@ class SythesisNetwork(nn.Module):
     """
     styleGAN generator
     """
-    def __init__(self,latent_dim = 512,):
+    def __init__(self,latent_dim = 512,use_batchNorm = True):
         super().__init__()
 
         self.mapping_network = MappingNetwork(latent_dim=latent_dim)
         self.base = BaseBlock(latent_dim=latent_dim)
         self.up1 = nn.Upsample(size = 8,mode = "bilinear")
         self.block1 = SynthBlock(
-            in_channels=256,out_channels=128,img_size=8,latent_dim=latent_dim
+            in_channels=256,out_channels=128,img_size=8,latent_dim=latent_dim,
+            use_batchNorm=use_batchNorm
         )
         self.up2 = nn.Upsample(size = 16,mode = "bilinear")
         self.block2 =SynthBlock(
-            in_channels=128,out_channels=128,img_size=16,latent_dim=latent_dim
+            in_channels=128,out_channels=128,img_size=16,latent_dim=latent_dim,
+            use_batchNorm=use_batchNorm
         )
         self.up3 = nn.Upsample(size = 32,mode = "bilinear")
         self.block3 = SynthBlock(
-            in_channels=128,out_channels=64,img_size=32,latent_dim=latent_dim
+            in_channels=128,out_channels=64,img_size=32,latent_dim=latent_dim,
+            use_batchNorm=use_batchNorm
         )
         self.up4 = nn.Upsample(size = 64,mode = "bilinear")
         self.block4 = SynthBlock(
-            in_channels=64,out_channels=3,img_size=64,latent_dim=latent_dim
+            in_channels=64,out_channels=3,img_size=64,latent_dim=latent_dim,
+            use_batchNorm=use_batchNorm,activation = nn.Tanh()
             )
-        self.tanh = nn.Tanh()
         self.initialize_weights()
 
     def forward(self,z):
@@ -71,7 +74,7 @@ class SythesisNetwork(nn.Module):
 
         out = self.up4(out)
         out = self.block4(out,W)
-        return self.tanh(out)
+        return out
 
     def initialize_weights(self):
         for m in self.modules():
