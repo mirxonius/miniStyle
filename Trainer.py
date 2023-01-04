@@ -122,16 +122,18 @@ class Trainer(TrainerBlooprint):
                 self.static_noise = torch.randn((n_images,self.latentDim,1,1),device = device)
             else:
                 self.static_noise = torch.randn((n_images,self.latentDim),device = device)
-                
+
+        self.generator.eval()        
         with torch.no_grad():
             imgs = self.generator(self.static_noise)
         if transform is not None:
             imgs = transform(imgs)
+        self.generator.train()
         imgs = torchvision.utils.make_grid(imgs.cpu(),nrow = n_row).permute(1,2,0)
         return imgs
 
     def train_with_epochs(self,
-    n_epochs=100,d_to_g_rate=3,
+    n_epochs=100,regime=(3,2),
     save_every = 100,
     transform = None,plot_every = 5
     ):
@@ -141,14 +143,16 @@ class Trainer(TrainerBlooprint):
         :d_to_g_rate: int Number of steps to train discrimnator
         to the number of steps to train generator
        """
+        d_steps, g_steps = regime
         self.generator.train()
         self.discriminator.train()
 
         for epoch in tqdm(range(n_epochs)):
             for i,img in enumerate(self.loader):
                 self.train_discriminator(img.to(self.device))
-                if (i+1)%d_to_g_rate == 0:
-                    self.train_generator()
+                if (i+1)%d_steps == 0:
+                    for _ in range(g_steps):
+                        self.train_generator()
                 if (i+1)%save_every==0:
                     self.save_models()
 

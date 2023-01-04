@@ -12,9 +12,11 @@ class MappingNetwork(nn.Module):
         super().__init__()
         self.activation = activation
         modules = list()
-        for _ in range(n_layers):
+        for _ in range(n_layers-1):
             modules.append(nn.Linear(latent_dim,latent_dim))
             modules.append(self.activation)
+    
+        modules.append(nn.Linear(latent_dim,latent_dim))
         self.network = nn.Sequential(*modules)
         
     def forward(self,z):
@@ -54,9 +56,11 @@ class SythesisNetwork(nn.Module):
         )
         self.up4 = nn.Upsample(size = 64,mode = "bilinear")
         self.block4 = SynthBlock(
-            in_channels=64,out_channels=3,img_size=64,latent_dim=latent_dim,
-            use_batchNorm=use_batchNorm,activation = nn.Tanh()
+            in_channels=64,out_channels=64,img_size=64,latent_dim=latent_dim,
+            use_batchNorm=use_batchNorm
             )
+        self.block5 = nn.Conv2d(in_channels=64,out_channels=3,bias = False,kernel_size=3,padding = 1)
+        self.tanh = nn.Tanh()
         self.initialize_weights()
 
     def forward(self,z):
@@ -74,7 +78,7 @@ class SythesisNetwork(nn.Module):
 
         out = self.up4(out)
         out = self.block4(out,W)
-        return out
+        return self.block5(out)
 
     def initialize_weights(self):
         for m in self.modules():

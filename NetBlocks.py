@@ -37,12 +37,12 @@ class BaseBlock(nn.Module):
     """
     def __init__(self,latent_dim = 512) -> None:
         super().__init__()
-        self.base = nn.Parameter(torch.randn(1,latent_dim,4,4,requires_grad = True))
+        self.base = nn.Parameter(torch.ones(1,latent_dim,4,4,requires_grad = True))
         self.ada_in1 = AdaIN(4,latent_dim,latent_dim)
         self.conv = nn.Conv2d(in_channels=latent_dim,out_channels=256,kernel_size=3,padding=1)
         self.ada_in2 = AdaIN(4,latent_dim,256)
-        self.B1_noise = nn.Parameter(torch.randn(latent_dim)).view(1,-1,1,1)
-        self.B2_noise = nn.Parameter(torch.randn(256)).view(1,-1,1,1)    
+        self.B1_noise = nn.Parameter(torch.zeros(latent_dim)).view(1,-1,1,1)
+        self.B2_noise = nn.Parameter(torch.zeros(256)).view(1,-1,1,1)    
     
     def forward(self,w):
         out = self.base 
@@ -72,7 +72,7 @@ class SynthBlock(nn.Module):
         self.latent_dim = latent_dim
         self.img_size = img_size
         self.out_channels = out_channels
-        self.B_noise = nn.Parameter(1e-1*torch.randn(out_channels)).view(1,-1,1,1)
+        self.B_noise = nn.Parameter(torch.zeros(out_channels)).view(1,-1,1,1)
         
        
         self.conv1 = convBlock(
@@ -174,13 +174,13 @@ class DiscBlock(nn.Module):
         in_channels = in_channels,
         out_channels = out_channels,
         kernel_size=3,padding = 1,
-        bias = not use_batchNorm,
+        bias = False,
          )
         self.conv2 = nn.Conv2d(
             in_channels = out_channels,
             out_channels = out_channels,
             kernel_size=3,padding = 1,
-            bias = not use_batchNorm
+            bias = False
         )
         if use_batchNorm:
             self.net = nn.Sequential(
