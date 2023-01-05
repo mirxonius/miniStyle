@@ -22,7 +22,8 @@ class CelebaDataset(Dataset):
             root=data_dir,
             transform=transforms.Compose(
                 [transforms.ToTensor(),
-                transforms.Normalize(self.means,self.stds)]
+                transforms.Normalize(self.means,self.stds)
+                 ]
             )
         )
         self.data.class_to_idx = {}

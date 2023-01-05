@@ -34,33 +34,49 @@ class SythesisNetwork(nn.Module):
     """
     styleGAN generator
     """
-    def __init__(self,latent_dim = 512,use_batchNorm = True):
+    def __init__(self,latent_dim = 512,use_batchNorm = True,upscale_with_conv = False):
         super().__init__()
 
         self.mapping_network = MappingNetwork(latent_dim=latent_dim)
-        self.base = BaseBlock(latent_dim=latent_dim)
-        self.up1 = nn.Upsample(size = 8,mode = "bilinear")
+        self.base = BaseBlock(latent_dim=latent_dim,out_channels=512)
         self.block1 = SynthBlock(
-            in_channels=256,out_channels=128,img_size=8,latent_dim=latent_dim,
+            in_channels=512,out_channels=256,img_size=8,latent_dim=latent_dim,
             use_batchNorm=use_batchNorm
         )
-        self.up2 = nn.Upsample(size = 16,mode = "bilinear")
         self.block2 =SynthBlock(
-            in_channels=128,out_channels=128,img_size=16,latent_dim=latent_dim,
+            in_channels=256,out_channels=128,img_size=16,latent_dim=latent_dim,
             use_batchNorm=use_batchNorm
         )
-        self.up3 = nn.Upsample(size = 32,mode = "bilinear")
         self.block3 = SynthBlock(
             in_channels=128,out_channels=64,img_size=32,latent_dim=latent_dim,
             use_batchNorm=use_batchNorm
         )
-        self.up4 = nn.Upsample(size = 64,mode = "bilinear")
         self.block4 = SynthBlock(
-            in_channels=64,out_channels=64,img_size=64,latent_dim=latent_dim,
+            in_channels=64,out_channels=32,img_size=64,latent_dim=latent_dim,
             use_batchNorm=use_batchNorm
             )
-        self.block5 = nn.Conv2d(in_channels=64,out_channels=3,bias = False,kernel_size=3,padding = 1)
+        self.block5 = nn.Conv2d(in_channels=32,out_channels=3,bias = False,kernel_size=3,padding = 1)
         self.tanh = nn.Tanh()
+        if upscale_with_conv:
+            self.up1 = nn.ConvTranspose2d(
+                in_channels=512,out_channels=512,kernel_size=4,stride = 2,padding= 1
+            
+            )
+            self.up2 = nn.ConvTranspose2d(
+                in_channels=256,out_channels=256,kernel_size=4,stride = 2,padding= 1
+            )
+            self.up3 = nn.ConvTranspose2d(
+                in_channels=128,out_channels=128,kernel_size=4,stride = 2,padding= 1
+            )
+            self.up4 = nn.ConvTranspose2d(
+                in_channels=64,out_channels=64,kernel_size=4,stride = 2,padding= 1
+            )
+        else:
+            self.up1 = nn.Upsample(size = 8,mode = "bilinear")
+            self.up2 = nn.Upsample(size = 16,mode = "bilinear")
+            self.up3 = nn.Upsample(size = 32,mode = "bilinear")
+            self.up4 = nn.Upsample(size = 64,mode = "bilinear")
+
         self.initialize_weights()
 
     def forward(self,z):
@@ -78,7 +94,8 @@ class SythesisNetwork(nn.Module):
 
         out = self.up4(out)
         out = self.block4(out,W)
-        return self.block5(out)
+        out = self.block5(out)
+        return self.tanh(out)
 
     def initialize_weights(self):
         for m in self.modules():
@@ -101,28 +118,28 @@ class Discriminator(nn.Module):
         self.lrelu = nn.LeakyReLU(0.2, inplace=True)
         
         self.layer1 = convBlock(
-        in_chs = 3, out_chs = 64 , kernel_size =4 , stride =2,  
+        in_channels = 3, out_channels = 64 , kernel_size =4 , stride =2,  
         activation=self.lrelu
         )
 
         
         self.layer2 = convBlock(
-        in_chs =64 , out_chs =128 , kernel_size = 4, stride =2,  
+        in_channels =64 , out_channels =128 , kernel_size = 4, stride =2,  
         activation=self.lrelu
         )
         
         self.layer3 = convBlock(
-        in_chs =128 , out_chs =256 , kernel_size = 4, stride =2,  
+        in_channels =128 , out_channels =256 , kernel_size = 4, stride =2,  
         activation=self.lrelu
         )
         
         self.layer4 = convBlock(
-        in_chs =256 , out_chs =512 , kernel_size = 4, stride =2,
+        in_channels =256 , out_channels =512 , kernel_size = 4, stride =2,
         activation=self.lrelu
         )
         
         self.layer5 = convBlock(
-        in_chs =512 , out_chs = 1, kernel_size = 4, stride =1, padding= 0,
+        in_channels =512 , out_channels = 1, kernel_size = 4, stride =1, padding= 0,
         activation=None)
         
         self.initialize_weights()
@@ -143,7 +160,7 @@ class Discriminator(nn.Module):
 
 
 class DCStyleGenerator(nn.Module):
-    def __init__(self,latent_size = 100,) -> None:
+    def __init__(self,latent_size = 100,use_batchNorm=True) -> None:
         super().__init__()
         """
         DC GAN generator that uses styes with ADAIN
@@ -155,26 +172,26 @@ class DCStyleGenerator(nn.Module):
         self.tanh = nn.Tanh()
         
         self.layer1 = deConvBlock(
-            in_chs =self.latent_size ,out_chs=512, kernel_size = 4 ,stride = 1, padding=0,
-                        activation=self.lrelu)
+            in_channels =self.latent_size ,out_channels=512, kernel_size = 4 ,stride = 1, padding=0,
+                        activation=self.lrelu,use_batchNorm=use_batchNorm)
         self.ada_in1 = AdaIN(4,latent_size,512)
 
         self.layer2 = deConvBlock(
-            in_chs =512 ,out_chs=256, kernel_size = 4 ,stride = 2, padding=1,
-                       activation=self.lrelu )
+            in_channels =512 ,out_channels=256, kernel_size = 4 ,stride = 2, padding=1,
+                       activation=self.lrelu,use_batchNorm=use_batchNorm)
         self.ada_in2 = AdaIN(8,latent_size,256)
 
         self.layer3 = deConvBlock(
-            in_chs =256 ,out_chs=256, kernel_size = 4 ,stride = 2, padding=1,
-                        activation=self.lrelu)
+            in_channels =256 ,out_channels=256, kernel_size = 4 ,stride = 2, padding=1,
+                        activation=self.lrelu,use_batchNorm=use_batchNorm)
         self.ada_in3 = AdaIN(16,latent_size,256)
         self.layer4 = deConvBlock(
-            in_chs =256 ,out_chs=128, kernel_size = 4 ,stride = 2, padding=1,
-                        activation=self.lrelu)
+            in_channels =256 ,out_channels=128, kernel_size = 4 ,stride = 2, padding=1,
+                        activation=self.lrelu,use_batchNorm=use_batchNorm)
         self.ada_in4 = AdaIN(32,latent_size,128)
         self.layer5 = deConvBlock(
-            in_chs =128 ,out_chs=3, kernel_size = 4 ,stride = 2, padding=1,
-            activation = self.tanh  
+            in_channels =128 ,out_channels=3, kernel_size = 4 ,stride = 2, padding=1,
+            activation = self.tanh,use_batchNorm=use_batchNorm
                         )
         #self.ada_in5 = AdaIN(32,latent_size,3)
 
@@ -270,13 +287,14 @@ class StyleDiscrimnator(nn.Module):
         super().__init__()
         
         self.img_resolution = img_resolution
-        n_blocks = int(torch.log2(64))
+        n_blocks = int(torch.log2(torch.tensor(img_resolution)))
         blocks = []
         res = self.img_resolution
-        for _ in range(n_blocks):
+        blocks.append(DiscBlock(in_channels=3,out_channels=256))
+        for _ in range(n_blocks-1):
             res /= 2
             blocks.append(
-                DiscBlock(in_channels=512,out_channels=512)
+                DiscBlock(in_channels=256,out_channels=256)
                 )
             #Upsample can be used for downsampling as well    
             blocks.append(nn.Upsample(
@@ -284,9 +302,12 @@ class StyleDiscrimnator(nn.Module):
                 )
 
         blocks.append(nn.Flatten())
-        blocks.append(nn.Linear(512,1))
+        blocks.append(nn.Linear(256,1))
         self.net = nn.Sequential(*blocks)
 
 
     def forward(self, x):
         return self.net(x)
+
+
+

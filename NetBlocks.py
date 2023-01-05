@@ -35,14 +35,14 @@ class BaseBlock(nn.Module):
     """
     First block of the synthesis networks
     """
-    def __init__(self,latent_dim = 512) -> None:
+    def __init__(self,latent_dim = 512,out_channels = 256) -> None:
         super().__init__()
         self.base = nn.Parameter(torch.ones(1,latent_dim,4,4,requires_grad = True))
         self.ada_in1 = AdaIN(4,latent_dim,latent_dim)
-        self.conv = nn.Conv2d(in_channels=latent_dim,out_channels=256,kernel_size=3,padding=1)
-        self.ada_in2 = AdaIN(4,latent_dim,256)
+        self.conv = deConvBlock(in_channels=latent_dim,out_channels=out_channels,kernel_size=3,padding=1)
+        self.ada_in2 = AdaIN(4,latent_dim,out_channels)
         self.B1_noise = nn.Parameter(torch.zeros(latent_dim)).view(1,-1,1,1)
-        self.B2_noise = nn.Parameter(torch.zeros(256)).view(1,-1,1,1)    
+        self.B2_noise = nn.Parameter(torch.zeros(out_channels)).view(1,-1,1,1)    
     
     def forward(self,w):
         out = self.base 
@@ -75,13 +75,13 @@ class SynthBlock(nn.Module):
         self.B_noise = nn.Parameter(torch.zeros(out_channels)).view(1,-1,1,1)
         
        
-        self.conv1 = convBlock(
-            in_chs=in_channels,out_chs=out_channels,
+        self.conv1 = deConvBlock(
+            in_channels=in_channels,out_channels=out_channels,
             kernel_size=3,padding = 1,use_batchNorm=use_batchNorm,activation = activation
         )
         
-        self.conv2 = convBlock(
-            in_chs=out_channels,out_chs=out_channels,
+        self.conv2 = deConvBlock(
+            in_channels=out_channels,out_channels=out_channels,
             kernel_size=3,padding = 1,use_batchNorm=use_batchNorm,activation = activation)
 
         
@@ -113,7 +113,7 @@ class SynthBlock(nn.Module):
 #   Conv - BatchNorm - Activation   #
 #####################################
 class convBlock(nn.Sequential):
-    def __init__(self,in_chs,out_chs,kernel_size = 4,
+    def __init__(self,in_channels,out_channels,kernel_size = 4,
                  stride = 1,padding= 1,
                  activation = nn.LeakyReLU(0.2,inplace = False),
                  use_batchNorm = True):
@@ -121,13 +121,13 @@ class convBlock(nn.Sequential):
         self.add_module(
            "conv",
            nn.Conv2d(
-            in_channels = in_chs,
-           out_channels = out_chs,
+            in_channels = in_channels,
+           out_channels = out_channels,
            kernel_size=kernel_size,
            padding=padding,stride = stride,bias = False)
         )
-        if out_chs > 1 and use_batchNorm:
-            self.add_module("bnorm",nn.BatchNorm2d(out_chs))
+        if out_channels > 1 and use_batchNorm:
+            self.add_module("bnorm",nn.BatchNorm2d(out_channels))
         if activation is not None:
             self.add_module("activation",activation)
     def initialize_weights(self):
@@ -139,18 +139,20 @@ class convBlock(nn.Sequential):
 # ConvTranspose - BatchNorm - Activation #
 ##########################################        
 class deConvBlock(nn.Sequential):
-    def __init__(self,in_chs,out_chs,kernel_size = 4,
-                 stride = 1,padding= 1,activation = nn.LeakyReLU(0.2,inplace = True)):
+    def __init__(self,in_channels,out_channels,kernel_size = 4,
+                 stride = 1,padding= 1,activation = nn.LeakyReLU(0.2,inplace = True),
+                 use_batchNorm = True):
+                 
         super().__init__()
         self.add_module("deConv",
         nn.ConvTranspose2d(
-                in_channels=in_chs,
-                out_channels=out_chs,
+                in_channels=in_channels,
+                out_channels=out_channels,
                 kernel_size=kernel_size,
                 padding=padding,bias = False,stride=stride,
         ))
-        if out_chs >1:
-            self.add_module("bnorm",nn.BatchNorm2d(out_chs))
+        if out_channels > 1 and use_batchNorm:
+            self.add_module("bnorm",nn.BatchNorm2d(out_channels))
         if activation is not None:
             self.add_module("activation", activation)
     

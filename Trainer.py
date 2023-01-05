@@ -102,8 +102,8 @@ class Trainer(TrainerBlooprint):
 
     def train_generator(self):
         self.gOptim.zero_grad()
-        labels = torch.ones(self.latent_shape[0], dtype=torch.float32,device =self.device)
-        z = torch.randn(self.latent_shape,device=self.device,dtype = torch.float32)
+        labels = torch.ones(self.latent_shape[0], dtype=torch.float32,device=self.device)
+        z = torch.randn(self.latent_shape,dtype = torch.float32,device=self.device)
         
         loss = self.loss_fn(self.discriminator(self.generator(z)),
                             labels)
