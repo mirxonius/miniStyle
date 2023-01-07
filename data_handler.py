@@ -7,10 +7,9 @@ from PIL import Image
 import os
 from tqdm import tqdm
 
-ROOT_DIR = "./data/"
+ROOT_DIR = "./metfaces/"
 
-
-class CelebaDataset(Dataset):
+class MetfacesDataset(Dataset):
 
     def __init__(self,data_dir = ROOT_DIR,eps = 1e-4):
         self.data_dir = data_dir

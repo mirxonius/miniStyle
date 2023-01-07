@@ -92,7 +92,8 @@ class Trainer(TrainerBlooprint):
         z = torch.randn(self.latent_shape,device=self.device,dtype=torch.float32)
         fake_labels = torch.zeros(self.latent_shape[0],device=self.device,dtype=torch.float32)
         with torch.no_grad():
-            fake_imgs = self.generator(z)        
+            fake_imgs = self.generator(z)
+        
         dloss = 0.5*(self.loss_fn(self.discriminator(img),real_labels)\
              + self.loss_fn(self.discriminator(fake_imgs),fake_labels))
         dloss.backward()
@@ -133,8 +134,8 @@ class Trainer(TrainerBlooprint):
     def train(self,
     n_steps,regime = (1,1),
     train_reconstruction = False,
-    batch_size =32,save_every = 500,
-    transform = None,plot_every = 5
+    batch_size =32,save_every = 2000,
+    transform = None,plot_every = 1000
     ):
         """
         Args: 
@@ -155,7 +156,7 @@ class Trainer(TrainerBlooprint):
                     self.reconstruction_step(next(iter(self.loader)).to(self.device))
                 self.train_generator(batch_size=batch_size)
             if (i+1)%save_every==0:
-                self.save_models()
+                self.save_models(name=f"/step_{i+1}")
 
             if (i+1)%plot_every == 0:
                 plt.close("all")
@@ -163,7 +164,8 @@ class Trainer(TrainerBlooprint):
                     self.generator_progress(transform=transform)
                     )
                 plt.show()
-        self.save_models()
+
+        self.save_models(name=f"/step_{i+1}")
 
     def reconstuction_step(self,img):
         if not hasattr(self,"reconstructionLoss"):
@@ -179,7 +181,7 @@ class Trainer(TrainerBlooprint):
     def save_models(self,name = ""):
         save_dir = "models"+name+"/"
         os.makedirs(save_dir,exist_ok=True)
-        torch.save(self.generator.state_dict,save_dir+"generator.pth")
-        torch.save(self.discriminator.state_dict,save_dir+"discriminator.pth")
+        torch.save(self.generator.state_dict, save_dir + f"generator.pth")
+        torch.save(self.discriminator.state_dict, save_dir + f"discriminator.pth")
 
 

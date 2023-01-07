@@ -47,6 +47,10 @@ class SythesisNetwork(nn.Module):
         self.block4 = SynthBlock(
             in_channels=32,out_channels=3,img_size=64,latent_dim=latent_dim
             )
+        self.up4 = nn.Upsample(size = 64,mode = "bilinear")
+        self.block4 = SynthBlock(
+            in_channels=32,out_channels=3,img_size=64,latent_dim=latent_dim
+            )
         #self.tanh = nn.Tanh()
 
     def forward(self,z):
@@ -99,9 +103,21 @@ class Discriminator(nn.Module):
         )
         
         self.layer5 = convBlock(
-        in_chs =512 , out_chs = 1, kernel_size = 4, stride =1, padding= 0,
-        activation=None)
+        in_chs =512 , out_chs = 1024, kernel_size = 4, stride = 2,
+        activation=self.lrelu)
         
+        self.layer6 = convBlock(
+        in_chs =1024 , out_chs = 2048, kernel_size = 4, stride = 2,
+        activation=self.lrelu)
+
+
+        self.layer7  = convBlock(
+        in_chs =2048 , out_chs = 4096, kernel_size = 4, stride = 2,
+        activation=self.lrelu)
+
+        self.layer8  = convBlock(
+        in_chs =4096 , out_chs = 1, kernel_size = 4, stride = 1,
+        activation=None)
 
     def forward(self, x):
         out = self.layer1(x)
@@ -109,6 +125,9 @@ class Discriminator(nn.Module):
         out = self.layer3(out)
         out = self.layer4(out)
         out = self.layer5(out)
+        out = self.layer6(out)
+        out = self.layer7(out)
+        out = self.layer8(out)
         return out.squeeze()
 
 
@@ -127,28 +146,35 @@ class DCGenerator(nn.Module):
         self.tanh = nn.Tanh()
         
         self.layer1 = deConvBlock(
-            in_chs =self.latent_size ,out_chs=512, kernel_size =4 ,stride = 1, padding=0,
+            in_chs =self.latent_size ,out_chs=2048, kernel_size =4 ,stride = 1, padding=0,
                         activation=self.lrelu)
 
         self.layer2 = deConvBlock(
-            in_chs =512 ,out_chs=256, kernel_size =4 ,stride = 2, padding=1,
+            in_chs =2048 ,out_chs=1024, kernel_size =4 ,stride = 2, padding=1,
                        activation=self.lrelu )
         self.layer3 = deConvBlock(
-            in_chs =256 ,out_chs=128, kernel_size =4 ,stride = 2, padding=1,
+            in_chs =1024 ,out_chs=512, kernel_size =4 ,stride = 2, padding=1,
                         activation=self.lrelu)
         self.layer4 = deConvBlock(
-            in_chs =128 ,out_chs=64, kernel_size =4 ,stride = 2, padding=1,
+            in_chs =512 ,out_chs=256, kernel_size =4 ,stride = 2, padding=1,
                         activation=self.lrelu)
         self.layer5 = deConvBlock(
+            in_chs =256 ,out_chs=128, kernel_size =4 ,stride = 2, padding=1,
+            activation = self.lrelu)
+        self.layer6 = deConvBlock(
+            in_chs =128 ,out_chs=64, kernel_size =4 ,stride = 2, padding=1,
+            activation = self.lrelu)
+        self.layer7 = deConvBlock(
             in_chs =64 ,out_chs=3, kernel_size =4 ,stride = 2, padding=1,
-            activation = self.tanh  
-                        )
-
+            activation = self.tanh)
         if use_dropout:
             self.dp1 = nn.Dropout2d(p = 0.25)
             self.dp2 = nn.Dropout2d(p = 0.25)
             self.dp3 = nn.Dropout2d(p = 0.25)
             self.dp4 = nn.Dropout2d(p = 0.25)
+            self.dp5 = nn.Dropout2d(p = 0.25)
+            self.dp6 = nn.Dropout2d(p = 0.25)
+            self.dp7 = nn.Dropout2d(p = 0.25)
             self.net = nn.Sequential(
                 self.layer1,
                 self.dp1,
@@ -158,7 +184,11 @@ class DCGenerator(nn.Module):
                 self.dp3,
                 self.layer4,
                 self.dp4,
-                self.layer5
+                self.layer5,
+                self.dp5,
+                self.layer6,
+                self.dp6,
+                self.layer7,
             )
         else:
             self.net = nn.Sequential(
@@ -166,7 +196,9 @@ class DCGenerator(nn.Module):
                 self.layer2,
                 self.layer3,
                 self.layer4,
-                self.layer5
+                self.layer5,
+                self.layer6,
+                self.layer7, 
             )
 
     def forward(self, x):
