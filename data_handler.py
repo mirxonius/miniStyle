@@ -48,14 +48,5 @@ class CelebaDataset(Dataset):
 
 
 
-class Augmentator(nn.Sequential):
-
-    def __init__(self,transforms):
-        super(Augmentator, self).__init__()
-        if transforms is not None:
-            for trans in transforms:
-                self.add_module(trans)
-        else:
-            pass
 
         

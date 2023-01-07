@@ -75,12 +75,12 @@ class SynthBlock(nn.Module):
         self.B_noise = nn.Parameter(torch.zeros(out_channels)).view(1,-1,1,1)
         
        
-        self.conv1 = deConvBlock(
+        self.conv1 = convBlock(
             in_channels=in_channels,out_channels=out_channels,
             kernel_size=3,padding = 1,use_batchNorm=use_batchNorm,activation = activation
         )
         
-        self.conv2 = deConvBlock(
+        self.conv2 = convBlock(
             in_channels=out_channels,out_channels=out_channels,
             kernel_size=3,padding = 1,use_batchNorm=use_batchNorm,activation = activation)
 
@@ -160,7 +160,7 @@ class deConvBlock(nn.Sequential):
         for m in self.modules():
             if isinstance(m, nn.ConvTranspose2d):
                 nn.init.kaiming_normal_(m.weight)
-
+    
 
 class DiscBlock(nn.Module):
 

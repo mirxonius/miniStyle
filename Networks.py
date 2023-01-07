@@ -34,9 +34,11 @@ class SythesisNetwork(nn.Module):
     """
     styleGAN generator
     """
-    def __init__(self,latent_dim = 512,use_batchNorm = True,upscale_with_conv = False):
+    def __init__(self,latent_dim = 512,use_batchNorm = True,upscale_with_conv = False,
+    name = "StyleSynthesisNetwork"
+    ):
         super().__init__()
-
+        self.name = name
         self.mapping_network = MappingNetwork(latent_dim=latent_dim)
         self.base = BaseBlock(latent_dim=latent_dim,out_channels=512)
         self.block1 = SynthBlock(
@@ -48,28 +50,33 @@ class SythesisNetwork(nn.Module):
             use_batchNorm=use_batchNorm
         )
         self.block3 = SynthBlock(
-            in_channels=128,out_channels=64,img_size=32,latent_dim=latent_dim,
+            in_channels=128,out_channels=128,img_size=32,latent_dim=latent_dim,
             use_batchNorm=use_batchNorm
         )
         self.block4 = SynthBlock(
-            in_channels=64,out_channels=32,img_size=64,latent_dim=latent_dim,
+            in_channels=128,out_channels=64,img_size=64,latent_dim=latent_dim,
             use_batchNorm=use_batchNorm
             )
-        self.block5 = nn.Conv2d(in_channels=32,out_channels=3,bias = False,kernel_size=3,padding = 1)
+        self.block5 = nn.Conv2d(in_channels=64,out_channels=3,bias = False,kernel_size=3,padding = 1)
         self.tanh = nn.Tanh()
+        
         if upscale_with_conv:
-            self.up1 = nn.ConvTranspose2d(
-                in_channels=512,out_channels=512,kernel_size=4,stride = 2,padding= 1
+            #base->block1
+            self.up1 = deConvBlock(
+                in_channels=512,out_channels=512,kernel_size=4,stride = 2,padding= 1,use_batchNorm=use_batchNorm
             
             )
-            self.up2 = nn.ConvTranspose2d(
-                in_channels=256,out_channels=256,kernel_size=4,stride = 2,padding= 1
+            #block1->block2
+            self.up2 = deConvBlock(
+                in_channels=256,out_channels=256,kernel_size=4,stride = 2,padding= 1,use_batchNorm=use_batchNorm
             )
-            self.up3 = nn.ConvTranspose2d(
-                in_channels=128,out_channels=128,kernel_size=4,stride = 2,padding= 1
+            #block2->block3
+            self.up3 = deConvBlock(
+                in_channels=128,out_channels=128,kernel_size=4,stride = 2,padding= 1,use_batchNorm=use_batchNorm
             )
-            self.up4 = nn.ConvTranspose2d(
-                in_channels=64,out_channels=64,kernel_size=4,stride = 2,padding= 1
+            #block3->block4
+            self.up4 = deConvBlock(
+                in_channels=128,out_channels=128,kernel_size=4,stride = 2,padding= 1,use_batchNorm=use_batchNorm
             )
         else:
             self.up1 = nn.Upsample(size = 8,mode = "bilinear")
@@ -107,14 +114,18 @@ class SythesisNetwork(nn.Module):
                 m.initialize_weights()
 
 
+
+
+
+
 class Discriminator(nn.Module):
     """
     DCGAN discriminator
     """
 
-    def __init__(self):
+    def __init__(self,name = "DCDiscriminator"):
         super().__init__()
-
+        self.name = name
         self.lrelu = nn.LeakyReLU(0.2, inplace=True)
         
         self.layer1 = convBlock(
@@ -160,54 +171,80 @@ class Discriminator(nn.Module):
 
 
 class DCStyleGenerator(nn.Module):
-    def __init__(self,latent_size = 100,use_batchNorm=True) -> None:
+    """
+    Generator network using ADAIN styles and transposed convolutions 
+    for layer upsampling.
+    """
+
+    def __init__(self,latent_size = 100,use_batchNorm=True,
+    layer_channels = [512,256,256,128],name = "DCStyleGenerator"
+    ) -> None:
         super().__init__()
         """
         DC GAN generator that uses styes with ADAIN
         """
+        self.name = name
         self.latent_size = latent_size
         self.mapping_network = MappingNetwork(latent_dim=latent_size)
 
         self.lrelu = nn.LeakyReLU(0.2, inplace=True)
         self.tanh = nn.Tanh()
         
-        self.layer1 = deConvBlock(
-            in_channels =self.latent_size ,out_channels=512, kernel_size = 4 ,stride = 1, padding=0,
-                        activation=self.lrelu,use_batchNorm=use_batchNorm)
-        self.ada_in1 = AdaIN(4,latent_size,512)
-
+        #self.layer1 = deConvBlock(
+        #    in_channels =self.latent_size ,out_channels=layer_channels[0], kernel_size = 4 ,stride = 1, padding=0,
+        #                activation=self.lrelu,use_batchNorm=use_batchNorm)
+        
+        #Layer 1
+        self.layer1 = BaseBlock(latent_dim=latent_size,out_channels=layer_channels[0])
+        
+        self.ada_in1 = AdaIN(4,latent_size,layer_channels[0])
+        #Layer 2
         self.layer2 = deConvBlock(
-            in_channels =512 ,out_channels=256, kernel_size = 4 ,stride = 2, padding=1,
+            in_channels =layer_channels[0] ,out_channels=layer_channels[1], kernel_size = 4 ,stride = 2, padding=1,
                        activation=self.lrelu,use_batchNorm=use_batchNorm)
-        self.ada_in2 = AdaIN(8,latent_size,256)
-
+        self.ada_in2 = AdaIN(8,latent_size,layer_channels[1])
+        self.B2 = nn.Parameter(torch.zeros(layer_channels[1])).view(1,-1,1,1)
+        #Layer 3
         self.layer3 = deConvBlock(
-            in_channels =256 ,out_channels=256, kernel_size = 4 ,stride = 2, padding=1,
+            in_channels =layer_channels[1] ,out_channels=layer_channels[2], kernel_size = 4 ,stride = 2, padding=1,
                         activation=self.lrelu,use_batchNorm=use_batchNorm)
-        self.ada_in3 = AdaIN(16,latent_size,256)
+        self.ada_in3 = AdaIN(16,latent_size,layer_channels[2])
+        self.B3 = nn.Parameter(torch.zeros(layer_channels[2])).view(1,-1,1,1)
+
+        #Layer 4
         self.layer4 = deConvBlock(
-            in_channels =256 ,out_channels=128, kernel_size = 4 ,stride = 2, padding=1,
+            in_channels =layer_channels[2] ,out_channels=layer_channels[3], kernel_size = 4 ,stride = 2, padding=1,
                         activation=self.lrelu,use_batchNorm=use_batchNorm)
-        self.ada_in4 = AdaIN(32,latent_size,128)
+        self.ada_in4 = AdaIN(32,latent_size,layer_channels[3])
+        self.B4 = nn.Parameter(torch.zeros(layer_channels[3])).view(1,-1,1,1)
+        
+        #Layer 5
         self.layer5 = deConvBlock(
-            in_channels =128 ,out_channels=3, kernel_size = 4 ,stride = 2, padding=1,
+            in_channels =layer_channels[3] ,out_channels=3, kernel_size = 4 ,stride = 2, padding=1,
             activation = self.tanh,use_batchNorm=use_batchNorm
-                        )
-        #self.ada_in5 = AdaIN(32,latent_size,3)
+                        ) 
+
+        self.ada_in5 = AdaIN(64,latent_size,3)
 
     def forward(self,z):
         w = self.mapping_network(z.view(-1,self.latent_size))
         
         out = self.layer1(z)
         out = self.ada_in1(out,w)
+
         out = self.layer2(out)
-        out = self.ada_in2(out,w)
+        noise = torch.randn(out.size(0),1,out.size(2),out.size(3)).to(w.device)
+        out = self.ada_in2(out,w) + self.B2.to(noise.device)*noise
+        
         out = self.layer3(out)
-        out = self.ada_in3(out,w)
+        noise = torch.randn(out.size(0),1,out.size(2),out.size(3)).to(w.device)
+        out = self.ada_in3(out,w) + self.B3.to(noise.device)*noise
+         
         out = self.layer4(out)
-        out = self.ada_in4(out,w)
+        noise = torch.randn(out.size(0),1,out.size(2),out.size(3)).to(w.device)
+        out = self.ada_in4(out,w) + self.B4.to(noise.device)*noise
         out = self.layer5(out)
-        #out = self.ada_in5(out,w)
+        out = self.ada_in5(out,w)
         return self.tanh(out)
 
     def inialize_weights(self):
@@ -230,20 +267,20 @@ class DCGenerator(nn.Module):
         self.tanh = nn.Tanh()
         
         self.layer1 = deConvBlock(
-            in_chs =self.latent_size ,out_chs=512, kernel_size =4 ,stride = 1, padding=0,
+            in_channels =self.latent_size ,out_channels=512, kernel_size =4 ,stride = 1, padding=0,
                         activation=self.lrelu)
 
         self.layer2 = deConvBlock(
-            in_chs =512 ,out_chs=256, kernel_size =4 ,stride = 2, padding=1,
+            in_channels =512 ,out_channels=256, kernel_size =4 ,stride = 2, padding=1,
                        activation=self.lrelu )
         self.layer3 = deConvBlock(
-            in_chs =256 ,out_chs=256, kernel_size =4 ,stride = 2, padding=1,
+            in_channels =256 ,out_channels=256, kernel_size =4 ,stride = 2, padding=1,
                         activation=self.lrelu)
         self.layer4 = deConvBlock(
-            in_chs =256 ,out_chs=128, kernel_size =4 ,stride = 2, padding=1,
+            in_channels =256 ,out_channels=128, kernel_size =4 ,stride = 2, padding=1,
                         activation=self.lrelu)
         self.layer5 = deConvBlock(
-            in_chs =128 ,out_chs=3, kernel_size =4 ,stride = 2, padding=1,
+            in_channels =128 ,out_channels=3, kernel_size =4 ,stride = 2, padding=1,
             activation = self.tanh  
                         )
 

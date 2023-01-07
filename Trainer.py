@@ -123,12 +123,20 @@ class Trainer(TrainerBlooprint):
             else:
                 self.static_noise = torch.randn((n_images,self.latentDim),device = device)
 
-        self.generator.eval()        
+        self.generator.eval()
+        self.discriminator.eval()        
         with torch.no_grad():
             imgs = self.generator(self.static_noise)
+            print(
+                torch.mean(
+                self.discriminator(imgs).cpu()
+                ).detach().numpy()
+                )
         if transform is not None:
             imgs = transform(imgs)
         self.generator.train()
+        self.discriminator.train()
+                
         imgs = torchvision.utils.make_grid(imgs.cpu(),nrow = n_row).permute(1,2,0)
         return imgs
 
@@ -214,7 +222,16 @@ class Trainer(TrainerBlooprint):
     def save_models(self,name = ""):
         save_dir = "models"+name+"/"
         os.makedirs(save_dir,exist_ok=True)
-        torch.save(self.generator.state_dict,save_dir+"generator.pth")
-        torch.save(self.discriminator.state_dict,save_dir+"discriminator.pth")
+        
+        if hasattr(self.generator,"name"):
+            torch.save(self.generator.state_dict(),save_dir+"{}.pth".format(self.generator.name))
+        else:
+            torch.save(self.generator.state_dict(),save_dir+"generator.pth")
+
+
+        if hasattr(self.discriminator,"name"):
+            torch.save(self.discriminator.state_dict(),save_dir+"{}.pth".format(self.discriminator.name))
+        else:
+            torch.save(self.discriminator.state_dict(),save_dir+"discriminator.pth")
 
 
