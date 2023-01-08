@@ -102,8 +102,8 @@ class Trainer(TrainerBlooprint):
 
     def train_generator(self):
         self.gOptim.zero_grad()
-        labels = torch.ones(self.latent_shape[0], dtype=torch.float32,device =self.device)
-        z = torch.randn(self.latent_shape,device=self.device,dtype = torch.float32)
+        labels = torch.ones(self.latent_shape[0], dtype=torch.float32,device=self.device)
+        z = torch.randn(self.latent_shape,dtype = torch.float32,device=self.device)
         
         loss = self.loss_fn(self.discriminator(self.generator(z)),
                             labels)
@@ -122,16 +122,26 @@ class Trainer(TrainerBlooprint):
                 self.static_noise = torch.randn((n_images,self.latentDim,1,1),device = device)
             else:
                 self.static_noise = torch.randn((n_images,self.latentDim),device = device)
-                
+
+        self.generator.eval()
+        self.discriminator.eval()        
         with torch.no_grad():
             imgs = self.generator(self.static_noise)
+            print(
+                torch.mean(
+                self.discriminator(imgs).cpu()
+                ).detach().numpy()
+                )
         if transform is not None:
             imgs = transform(imgs)
+        self.generator.train()
+        self.discriminator.train()
+                
         imgs = torchvision.utils.make_grid(imgs.cpu(),nrow = n_row).permute(1,2,0)
         return imgs
 
     def train_with_epochs(self,
-    n_epochs=100,d_to_g_rate=3,
+    n_epochs=100,regime=(3,2),
     save_every = 100,
     transform = None,plot_every = 5
     ):
@@ -141,14 +151,16 @@ class Trainer(TrainerBlooprint):
         :d_to_g_rate: int Number of steps to train discrimnator
         to the number of steps to train generator
        """
+        d_steps, g_steps = regime
         self.generator.train()
         self.discriminator.train()
 
         for epoch in tqdm(range(n_epochs)):
             for i,img in enumerate(self.loader):
                 self.train_discriminator(img.to(self.device))
-                if (i+1)%d_to_g_rate == 0:
-                    self.train_generator()
+                if (i+1)%d_steps == 0:
+                    for _ in range(g_steps):
+                        self.train_generator()
                 if (i+1)%save_every==0:
                     self.save_models()
 
@@ -210,7 +222,16 @@ class Trainer(TrainerBlooprint):
     def save_models(self,name = ""):
         save_dir = "models"+name+"/"
         os.makedirs(save_dir,exist_ok=True)
-        torch.save(self.generator.state_dict,save_dir+"generator.pth")
-        torch.save(self.discriminator.state_dict,save_dir+"discriminator.pth")
+        
+        if hasattr(self.generator,"name"):
+            torch.save(self.generator.state_dict(),save_dir+"{}.pth".format(self.generator.name))
+        else:
+            torch.save(self.generator.state_dict(),save_dir+"generator.pth")
+
+
+        if hasattr(self.discriminator,"name"):
+            torch.save(self.discriminator.state_dict(),save_dir+"{}.pth".format(self.discriminator.name))
+        else:
+            torch.save(self.discriminator.state_dict(),save_dir+"discriminator.pth")
 
 

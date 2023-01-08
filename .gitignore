@@ -1,5 +1,8 @@
-img_align_celeba
-img_align_celeba.zip
+model_results
 data
+PerceptualSimilarity/
+StyleImages
+Real
+DCImages
+HybridImages
 img_align_celeba.zip
-models

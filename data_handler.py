@@ -1,4 +1,5 @@
 import torch
+import torch.nn as nn
 from torchvision.datasets import ImageFolder
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset,Subset
@@ -21,7 +22,8 @@ class CelebaDataset(Dataset):
             root=data_dir,
             transform=transforms.Compose(
                 [transforms.ToTensor(),
-                transforms.Normalize(self.means,self.stds)]
+                transforms.Normalize(self.means,self.stds)
+                 ]
             )
         )
         self.data.class_to_idx = {}
@@ -43,3 +45,8 @@ class CelebaDataset(Dataset):
     def un_normalize(self,img):
         device = img.device
         return img*self.stds.to(device) + self.means.to(device)
+
+
+
+
+        
